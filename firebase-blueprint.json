@@ -1,0 +1,128 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Authenticated farmer profile",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "User UID" },
+        "displayName": { "type": "string", "description": "Farmer name" },
+        "email": { "type": "string", "description": "Email address" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp via serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp via serverTimestamp()" }
+      },
+      "required": ["userId", "displayName"]
+    },
+    "FarmField": {
+      "title": "Farm Field",
+      "description": "Cultivated crop plot owned by the user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Field ID" },
+        "userId": { "type": "string", "description": "Owner user UID" },
+        "name": { "type": "string", "description": "Field / Plot title" },
+        "cropType": { "type": "string", "description": "Crop variety" },
+        "acreage": { "type": "number", "description": "Total acreage" },
+        "sowingDateMillis": { "type": "number", "description": "Sowing epoch millis" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp via serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp via serverTimestamp()" }
+      },
+      "required": ["id", "userId", "name", "cropType", "acreage"]
+    },
+    "GrowthMilestone": {
+      "title": "Growth Milestone",
+      "description": "Progress tracking log entry with date-stamped photo",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Milestone ID" },
+        "userId": { "type": "string", "description": "Owner UID" },
+        "fieldId": { "type": "string", "description": "Associated field ID" },
+        "stage": { "type": "string", "description": "Growth stage name" },
+        "plantHeightCm": { "type": "integer", "description": "Plant height in cm" },
+        "healthScore": { "type": "integer", "description": "Health score 1-10" },
+        "notes": { "type": "string", "description": "Farmer management notes" },
+        "dateLabel": { "type": "string", "description": "Day label (e.g. Day 21)" },
+        "daysAfterSowing": { "type": "integer", "description": "Days elapsed since sowing" },
+        "photoPath": { "type": "string", "description": "Local date-stamped photo path or URI" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp via serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp via serverTimestamp()" }
+      },
+      "required": ["id", "userId", "fieldId", "stage", "plantHeightCm", "healthScore"]
+    },
+    "CropScan": {
+      "title": "Crop Disease Scan",
+      "description": "Disease and pathology scan report",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Scan ID" },
+        "userId": { "type": "string", "description": "Owner UID" },
+        "cropName": { "type": "string", "description": "Target crop name" },
+        "diseaseName": { "type": "string", "description": "Identified disease/pest" },
+        "severity": { "type": "string", "description": "Severity level" },
+        "confidence": { "type": "number", "description": "AI Confidence score 0.0-1.0" },
+        "affectedAreaPercent": { "type": "number", "description": "Estimated leaf area affected %" },
+        "notes": { "type": "string", "description": "Farmer notes" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp via serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp via serverTimestamp()" }
+      },
+      "required": ["id", "userId", "cropName", "diseaseName", "severity"]
+    },
+    "CartItem": {
+      "title": "Cart Item",
+      "description": "Item in farmer treatment purchasing cart",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string", "description": "Product catalog ID" },
+        "userId": { "type": "string", "description": "Owner UID" },
+        "quantity": { "type": "integer", "description": "Cart quantity" },
+        "targetPlotAcres": { "type": "number", "description": "Calculated acreage" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp via serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp via serverTimestamp()" }
+      },
+      "required": ["productId", "userId", "quantity"]
+    },
+    "FarmOrder": {
+      "title": "Farm Order",
+      "description": "Confirmed agri-input treatment order",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "description": "Order code" },
+        "userId": { "type": "string", "description": "Owner UID" },
+        "summary": { "type": "string", "description": "Item summary" },
+        "totalUsd": { "type": "number", "description": "Order total" },
+        "farmAddress": { "type": "string", "description": "Delivery address" },
+        "status": { "type": "string", "description": "Order status" },
+        "estimatedArrival": { "type": "string", "description": "Estimated arrival date" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp via serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Update timestamp via serverTimestamp()" }
+      },
+      "required": ["orderId", "userId", "totalUsd", "farmAddress", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "entities.UserProfile" },
+      "description": "Farmer user profile"
+    },
+    "/users/{userId}/fields/{fieldId}": {
+      "schema": { "$ref": "entities.FarmField" },
+      "description": "Cultivated plots and fields"
+    },
+    "/users/{userId}/growth_milestones/{milestoneId}": {
+      "schema": { "$ref": "entities.GrowthMilestone" },
+      "description": "Growth logs and photo milestones for crops"
+    },
+    "/users/{userId}/scans/{scanId}": {
+      "schema": { "$ref": "entities.CropScan" },
+      "description": "Diagnostic scans"
+    },
+    "/users/{userId}/cart/{productId}": {
+      "schema": { "$ref": "entities.CartItem" },
+      "description": "Shopping cart items"
+    },
+    "/users/{userId}/orders/{orderId}": {
+      "schema": { "$ref": "entities.FarmOrder" },
+      "description": "Purchased agri treatment orders"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "AgroPulse",
+  "description": "Real-time crop disease detection with camera HUD, date-stamped visual growth log, treatment marketplace, agronomist AI chat, and localized weather alerts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

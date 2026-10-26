@@ -1,0 +1,242 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() <= 100 &&
+             (!('email' in data) || data.email == null || (data.email is string && data.email.size() <= 150));
+    }
+
+    function isValidFarmField(data) {
+      return data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128 &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.cropType is string && data.cropType.size() > 0 && data.cropType.size() <= 100 &&
+             data.acreage is number && data.acreage >= 0 &&
+             (!('sowingDateMillis' in data) || data.sowingDateMillis is number);
+    }
+
+    function isValidGrowthMilestone(data) {
+      return data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128 &&
+             data.fieldId is string && data.fieldId.size() > 0 && data.fieldId.size() <= 128 &&
+             data.stage is string && data.stage.size() > 0 && data.stage.size() <= 100 &&
+             data.plantHeightCm is int && data.plantHeightCm >= 0 &&
+             data.healthScore is int && data.healthScore >= 1 && data.healthScore <= 10 &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
+             (!('dateLabel' in data) || (data.dateLabel is string && data.dateLabel.size() <= 50)) &&
+             (!('daysAfterSowing' in data) || data.daysAfterSowing is int) &&
+             (!('photoPath' in data) || (data.photoPath is string && data.photoPath.size() <= 500));
+    }
+
+    function isValidCropScan(data) {
+      return data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128 &&
+             data.cropName is string && data.cropName.size() > 0 && data.cropName.size() <= 100 &&
+             data.diseaseName is string && data.diseaseName.size() > 0 && data.diseaseName.size() <= 100 &&
+             data.severity is string && data.severity.size() > 0 && data.severity.size() <= 50 &&
+             (!('confidence' in data) || data.confidence is number) &&
+             (!('affectedAreaPercent' in data) || data.affectedAreaPercent is number) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000));
+    }
+
+    function isValidCartItem(data) {
+      return data.productId is string && data.productId.size() > 0 && data.productId.size() <= 128 &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128 &&
+             data.quantity is int && data.quantity >= 1 && data.quantity <= 1000 &&
+             (!('targetPlotAcres' in data) || data.targetPlotAcres is number);
+    }
+
+    function isValidFarmOrder(data) {
+      return data.orderId is string && data.orderId.size() > 0 && data.orderId.size() <= 128 &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() <= 128 &&
+             data.totalUsd is number && data.totalUsd >= 0 &&
+             data.farmAddress is string && data.farmAddress.size() > 0 && data.farmAddress.size() <= 300 &&
+             data.status is string && data.status.size() > 0 && data.status.size() <= 50 &&
+             (!('summary' in data) || (data.summary is string && data.summary.size() <= 1000)) &&
+             (!('estimatedArrival' in data) || (data.estimatedArrival is string && data.estimatedArrival.size() <= 50));
+    }
+
+    // User profile
+    match /users/{userId} {
+      allow get: if isSignedIn() && request.auth.uid == userId;
+
+      allow create: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'displayName']) &&
+                       incoming().createdAt is timestamp &&
+                       incoming().createdAt <= request.time &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().updatedAt is timestamp &&
+                       incoming().updatedAt <= request.time &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'updatedAt']);
+
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+
+      // Subcollection: Fields
+      match /fields/{fieldId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == request.auth.uid &&
+                         isValidId(fieldId) &&
+                         incoming().id == fieldId &&
+                         incoming().keys().hasAll(['id', 'userId', 'name', 'cropType', 'acreage']) &&
+                         incoming().createdAt is timestamp &&
+                         incoming().createdAt <= request.time &&
+                         isValidFarmField(incoming());
+
+        allow update: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == existing().userId &&
+                         incoming().id == existing().id &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().updatedAt is timestamp &&
+                         incoming().updatedAt <= request.time &&
+                         isValidFarmField(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'cropType', 'acreage', 'sowingDateMillis', 'updatedAt']);
+
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      // Subcollection: Growth Milestones
+      match /growth_milestones/{milestoneId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == request.auth.uid &&
+                         isValidId(milestoneId) &&
+                         incoming().id == milestoneId &&
+                         incoming().keys().hasAll(['id', 'userId', 'fieldId', 'stage', 'plantHeightCm', 'healthScore']) &&
+                         incoming().createdAt is timestamp &&
+                         incoming().createdAt <= request.time &&
+                         isValidGrowthMilestone(incoming());
+
+        allow update: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == existing().userId &&
+                         incoming().id == existing().id &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().updatedAt is timestamp &&
+                         incoming().updatedAt <= request.time &&
+                         isValidGrowthMilestone(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['fieldId', 'stage', 'plantHeightCm', 'healthScore', 'notes', 'dateLabel', 'daysAfterSowing', 'photoPath', 'updatedAt']);
+
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      // Subcollection: Scans
+      match /scans/{scanId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == request.auth.uid &&
+                         isValidId(scanId) &&
+                         incoming().id == scanId &&
+                         incoming().keys().hasAll(['id', 'userId', 'cropName', 'diseaseName', 'severity']) &&
+                         incoming().createdAt is timestamp &&
+                         incoming().createdAt <= request.time &&
+                         isValidCropScan(incoming());
+
+        allow update: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == existing().userId &&
+                         incoming().id == existing().id &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().updatedAt is timestamp &&
+                         incoming().updatedAt <= request.time &&
+                         isValidCropScan(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['notes', 'updatedAt']);
+
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      // Subcollection: Cart
+      match /cart/{productId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == request.auth.uid &&
+                         isValidId(productId) &&
+                         incoming().productId == productId &&
+                         incoming().keys().hasAll(['productId', 'userId', 'quantity']) &&
+                         incoming().createdAt is timestamp &&
+                         incoming().createdAt <= request.time &&
+                         isValidCartItem(incoming());
+
+        allow update: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == existing().userId &&
+                         incoming().productId == existing().productId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().updatedAt is timestamp &&
+                         incoming().updatedAt <= request.time &&
+                         isValidCartItem(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['quantity', 'targetPlotAcres', 'updatedAt']);
+
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      // Subcollection: Orders
+      match /orders/{orderId} {
+        allow get, list: if isSignedIn() && request.auth.uid == userId;
+
+        allow create: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == request.auth.uid &&
+                         isValidId(orderId) &&
+                         incoming().orderId == orderId &&
+                         incoming().keys().hasAll(['orderId', 'userId', 'totalUsd', 'farmAddress', 'status']) &&
+                         incoming().createdAt is timestamp &&
+                         incoming().createdAt <= request.time &&
+                         isValidFarmOrder(incoming());
+
+        allow update: if isSignedIn() &&
+                         request.auth.uid == userId &&
+                         incoming().userId == existing().userId &&
+                         incoming().orderId == existing().orderId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().updatedAt is timestamp &&
+                         incoming().updatedAt <= request.time &&
+                         isValidFarmOrder(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'estimatedArrival', 'updatedAt']);
+
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+      }
+    }
+  }
+}
